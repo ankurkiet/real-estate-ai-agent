@@ -12,10 +12,11 @@ from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
+    ContextTypes,
     MessageHandler,
     filters,
-    ContextTypes
 )
+from telegram.error import Conflict
 
 from user_memory import (
     get_user_memory,
@@ -23,19 +24,33 @@ from user_memory import (
     clear_user_memory
 )
 
-# Enable logging
+# Only show WARNING+ from noisy libraries; keep our own prints clean
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    level=logging.WARNING
 )
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("telegram").setLevel(logging.WARNING)
+logging.getLogger("telegram.ext").setLevel(logging.WARNING)
 
 TOKEN = "8622581317:AAGinMyRGRYUmYL4kVzCmYeHJXRB0oAxvaw"
+
+
+async def handle_bot_error(update: object, context: ContextTypes.DEFAULT_TYPE):
+
+    error = context.error
+
+    if isinstance(error, Conflict):
+        print("[ERROR] Duplicate bot instance detected. Stop other bot.py processes.")
+        return
+
+    print(f"[ERROR] {type(error).__name__}: {error}")
 
 
 # START COMMAND
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    print("START COMMAND RECEIVED")
+    print("[BOT] /start")
 
     await update.message.reply_text(
         "🏠 Welcome to Real Estate AI Assistant"
@@ -61,7 +76,7 @@ async def handle_message(update, context):
 
     user_id = update.message.from_user.id
 
-    print("USER MESSAGE:", user_message)
+    print(f"[MSG] {user_message}")
 
     try:
 
@@ -76,29 +91,33 @@ async def handle_message(update, context):
 
             previous_memory = get_user_memory(user_id)
 
-            print("PREVIOUS MEMORY:", previous_memory)
-
             updated_memory = extract_requirements(
                 user_message,
                 previous_memory
             )
-
-            print("UPDATED MEMORY:", updated_memory)
 
             set_user_memory(
                 user_id,
                 updated_memory
             )
 
+            print(f"[SEARCH] intent={intent} | filters={updated_memory}")
+
             # Send to FastAPI
-            response = requests.post(
-                "http://127.0.0.1:8000/match-properties",
-                json=updated_memory
-            )
+            try:
+                response = requests.post(
+                    "http://127.0.0.1:8000/match-properties",
+                    json=updated_memory,
+                    timeout=30
+                )
+                response.raise_for_status()
+                data = response.json()
+            except requests.exceptions.RequestException as api_err:
+                print(f"[ERROR] API call failed: {api_err}")
+                await update.message.reply_text("⚠️ Search service unavailable. Please try again.")
+                return
 
-            data = response.json()
-
-            matches = data["matches"]
+            matches = data.get("matches", [])
 
             if len(matches) == 0:
 
@@ -133,13 +152,15 @@ async def handle_message(update, context):
 
         else:
 
+            print(f"[CHAT] intent={intent}")
+
             ai_reply = real_estate_chat(user_message)
 
             await update.message.reply_text(ai_reply)
 
     except Exception as e:
 
-        print("ERROR:", e)
+        print(f"[ERROR] {type(e).__name__}: {e}")
 
         await update.message.reply_text(
             "⚠️ Error processing your request"
@@ -155,6 +176,7 @@ def main():
     # Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("reset", reset))
+    app.add_error_handler(handle_bot_error)
 
     # Messages
     app.add_handler(

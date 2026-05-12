@@ -58,7 +58,6 @@ def match_properties(request: PropertyRequest):
                 reasons.append("Within budget")
 
         # Metro
-        print("request near metro:" , request.near_metro)
         if request.near_metro:
             if property["near_metro"]:
                 score += 15
