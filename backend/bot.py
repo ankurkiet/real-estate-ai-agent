@@ -33,7 +33,12 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram").setLevel(logging.WARNING)
 logging.getLogger("telegram.ext").setLevel(logging.WARNING)
 
-TOKEN = "8622581317:AAGinMyRGRYUmYL4kVzCmYeHJXRB0oAxvaw"
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 
 async def handle_bot_error(update: object, context: ContextTypes.DEFAULT_TYPE):
