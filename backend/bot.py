@@ -154,7 +154,9 @@ async def handle_message(update, context):
 
             print(f"[CHAT] intent={intent}")
 
-            ai_reply = real_estate_chat(user_message)
+            user_memory = get_user_memory(user_id)
+
+            ai_reply = real_estate_chat(user_message, user_memory)
 
             await update.message.reply_text(ai_reply)
 

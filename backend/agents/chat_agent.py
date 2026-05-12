@@ -2,11 +2,27 @@ from agents.client import call_llm, CHAT_MODEL
 from knowledge_base import REAL_ESTATE_KNOWLEDGE
 
 
-def real_estate_chat(user_message):
+def real_estate_chat(user_message, user_memory=None):
     """
     Responds to general real estate questions as an
     expert Indian real estate consultant.
     """
+
+    memory_context = ""
+    if user_memory:
+        parts = []
+        if user_memory.get("city"):
+            parts.append(f"Preferred city: {user_memory['city']}")
+        if user_memory.get("location"):
+            parts.append(f"Preferred location: {user_memory['location']}")
+        if user_memory.get("bhk"):
+            parts.append(f"BHK preference: {user_memory['bhk']} BHK")
+        if user_memory.get("budget"):
+            parts.append(f"Budget: {user_memory['budget']}")
+        if user_memory.get("purpose"):
+            parts.append(f"Purpose: {user_memory['purpose']}")
+        if parts:
+            memory_context = "\n    USER SAVED PREFERENCES:\n    " + "\n    ".join(parts) + "\n"
 
     prompt = f"""
     You are an expert Indian real estate consultant.
@@ -16,6 +32,8 @@ def real_estate_chat(user_message):
     2. Available property listings
 
     to answer user questions professionally.
+    {memory_context}
+    IMPORTANT: If the user has saved preferences (city/location), tailor your advice specifically to that area unless the user asks about a different place.
 
     REAL ESTATE KNOWLEDGE:
     {REAL_ESTATE_KNOWLEDGE}
